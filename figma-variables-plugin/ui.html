@@ -45,7 +45,7 @@
 </head>
 <body class="bg-gray-50 font-sans">
 <script>
-// Begin Mock Figma API for testing with state management and simulated error responses
+// Begin Mock Figma API with state management and successful responses
 var mockVariables = [
   { id: '1', name: 'primary-color', type: 'color', value: '#3b82f6' },
   { id: '2', name: 'secondary-color', type: 'color', value: '#8b5cf6' },
@@ -58,22 +58,31 @@ if (window === window.parent) {
   window.parent = {
     postMessage: function(message, targetOrigin) {
       if (message.pluginMessage) {
-        const type = message.pluginMessage.type;
+        var type = message.pluginMessage.type;
         if (type === 'loadVariables') {
-          setTimeout(() => {
+          setTimeout(function() {
             window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'loadVariablesSuccess', variables: mockVariables } } }));
           }, 500);
         } else if (type === 'createVariable') {
-          setTimeout(() => {
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'createVariableError', message: 'Simulated create error' } } }));
+          setTimeout(function() {
+            var newId = String(mockVariables.length + 1);
+            var newVar = { id: newId, name: message.pluginMessage.name, type: message.pluginMessage.variableType, value: 'default' };
+            mockVariables.push(newVar);
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'createVariableSuccess', variable: newVar } } }));
           }, 500);
         } else if (type === 'updateVariable') {
-          setTimeout(() => {
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'updateVariableError', message: 'Simulated update error' } } }));
+          setTimeout(function() {
+            var varId = message.pluginMessage.variableId;
+            var newValue = message.pluginMessage.value;
+            var variable = mockVariables.find(function(v) { return v.id === varId; });
+            if (variable) { variable.value = newValue; }
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'updateVariableSuccess', variableId: varId } } }));
           }, 500);
         } else if (type === 'deleteVariable') {
-          setTimeout(() => {
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'deleteVariableError', message: 'Simulated delete error' } } }));
+          setTimeout(function() {
+            var index = mockVariables.findIndex(function(v) { return v.id === '2'; });
+            if (index !== -1) { mockVariables.splice(index, 1); }
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'deleteVariableSuccess', collectionId: message.pluginMessage.collectionId } } }));
           }, 500);
         }
       }
@@ -82,7 +91,7 @@ if (window === window.parent) {
 }
 // End Mock Figma API
 </script>
-<!-- Rest of UI content remains unchanged -->
+<!-- Rest of UI content -->
 <div class="w-80 h-screen bg-white shadow-lg flex flex-col">
     <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-md">
         <div class="flex items-center justify-between">
