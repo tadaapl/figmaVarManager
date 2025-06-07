@@ -10,5 +10,6 @@
     "allowedDomains": [],
     "reasoning": ""
   },
-  "permissions": ["teamlibrary"]
+  "permissions": ["teamlibrary"],
+  "enableProposedApi": true
 }
