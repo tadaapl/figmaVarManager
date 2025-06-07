@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Figma Local Variables Plugin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Custom animations for smooth interactions */
+        @keyframes slideIn {
+            from { transform: translateY(-10px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Custom scrollbar for variable list */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+        
+        /* Variable type badges */
+        .type-color { background: linear-gradient(135deg, #f59e0b, #f97316); }
+        .type-number { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+        .type-string { background: linear-gradient(135deg, #10b981, #059669); }
+        .type-boolean { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+        
+        /* Hover effects */
+        .variable-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Modal backdrop */
+        .modal-backdrop {
+            backdrop-filter: blur(4px);
+            background: rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Main Plugin Container - This represents the Figma plugin UI panel -->
+    <div class="w-80 h-screen bg-white shadow-lg flex flex-col">
+        
+        <!-- Header Component - Plugin title and main actions -->
+        <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-md">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <i class="fas fa-layer-group text-xl"></i>
+                    <h1 class="text-lg font-bold">Local Variables</h1>
+                </div>
+                <!-- Refresh button to sync with Figma document -->
+                <button id="refreshBtn" class="p-2 hover:bg-white hover:bg-opacity-20 rounded-lg transition-all duration-200">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Search and Filter Component -->
+        <div class="p-4 border-b border-gray-200">
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="Search variables..." 
+                    class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                >
+                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+            </div>
+            
+            <!-- Filter by type -->
+            <div class="flex space-x-2 mt-3">
+                <button class="filter-btn active px-3 py-1 text-xs rounded-full bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors" data-type="all">All</button>
+                <button class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors" data-type="color">Color</button>
+                <button class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors" data-type="number">Number</button>
+                <button class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors" data-type="string">String</button>
+            </div>
+        </div>
+
+        <!-- Variables List Component - Scrollable list of all local variables -->
+        <div class="flex-1 overflow-y-auto custom-scrollbar">
+            <div id="variablesList" class="p-4 space-y-3">
+                <!-- Variable items will be dynamically populated here -->
+                <!-- Each variable item should be a reusable component showing name, value, type -->
+            </div>
+            
+            <!-- Empty state when no variables exist -->
+            <div id="emptyState" class="hidden flex flex-col items-center justify-center h-full text-gray-500 p-8">
+                <i class="fas fa-layer-group text-4xl mb-4 opacity-50"></i>
+                <h3 class="text-lg font-medium mb-2">No Variables Found</h3>
+                <p class="text-sm text-center mb-4">Create your first local variable to get started</p>
+                <button id="createFirstBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-plus mr-2"></i>Create Variable
+                </button>
+            </div>
+        </div>
+
+        <!-- Action Buttons Component -->
+        <div class="p-4 border-t border-gray-200 bg-gray-50">
+            <button id="createVariableBtn" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium">
+                <i class="fas fa-plus mr-2"></i>Create New Variable
+            </button>
+        </div>
+    </div>
+
+    <!-- Create/Edit Variable Modal Component -->
+    <div id="variableModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl w-96 max-w-full mx-4 slide-in">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <h2 id="modalTitle" class="text-xl font-bold text-gray-800">Create Variable</h2>
+                <button id="closeModal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="p-6 space-y-4">
+                <!-- Variable Name Input -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Variable Name</label>
+                    <input 
+                        type="text" 
+                        id="variableName" 
+                        placeholder="Enter variable name..." 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    >
+                    <p class="text-xs text-gray-500 mt-1">Must be unique and contain only letters, numbers, and underscores</p>
+                </div>
+                
+                <!-- Variable Type Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                    <select id="variableType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
+                        <option value="color">Color</option>
+                        <option value="number">Number</option>
+                        <option value="string">String</option>
+                        <option value="boolean">Boolean</option>
+                    </select>
+                </div>
+                
+                <!-- Variable Value Input - Dynamic based on type -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Value</label>
+                    
+                    <!-- Color input -->
+                    <div id="colorInput" class="variable-input">
+                        <div class="flex space-x-2">
+                            <input type="color" id="colorPicker" class="w-12 h-10 border border-gray-300 rounded cursor-pointer">
+                            <input type="text" id="colorHex" placeholder="#000000" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                    
+                    <!-- Number input -->
+                    <div id="numberInput" class="variable-input hidden">
+                        <input type="number" id="numberValue" placeholder="Enter number..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <!-- String input -->
+                    <div id="stringInput" class="variable-input hidden">
+                        <input type="text" id="stringValue" placeholder="Enter text..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    
+                    <!-- Boolean input -->
+                    <div id="booleanInput" class="variable-input hidden">
+                        <div class="flex space-x-4">
+                            <label class="flex items-center">
+                                <input type="radio" name="booleanValue" value="true" class="mr-2">
+                                <span>True</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="booleanValue" value="false" class="mr-2">
+                                <span>False</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Modal Footer -->
+            <div class="flex space-x-3 p-6 border-t border-gray-200">
+                <button id="cancelBtn" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                    Cancel
+                </button>
+                <button id="saveBtn" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-save mr-2"></i>Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal Component -->
+    <div id="deleteModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl w-96 max-w-full mx-4 slide-in">
+            <div class="p-6 text-center">
+                <div class="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-trash text-red-600 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-gray-800 mb-2">Delete Variable</h3>
+                <p class="text-gray-600 mb-6">Are you sure you want to delete "<span id="deleteVariableName" class="font-medium"></span>"? This action cannot be undone.</p>
+                <div class="flex space-x-3">
+                    <button id="cancelDeleteBtn" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirmDeleteBtn" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Component - For success/error messages -->
+    <div id="notification" class="hidden fixed top-4 right-4 z-50 slide-in">
+        <div class="bg-white border-l-4 border-green-500 rounded-lg shadow-lg p-4 max-w-sm">
+            <div class="flex items-center">
+                <i id="notificationIcon" class="fas fa-check-circle text-green-500 mr-3"></i>
+                <div>
+                    <p id="notificationMessage" class="text-sm font-medium text-gray-800"></p>
+                </div>
+                <button id="closeNotification" class="ml-4 text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer Component -->
+    <footer class="text-center py-2 text-xs text-gray-500 border-t border-gray-200">
+        Created with ❤️ by <a href="https://proofs.io" target="_blank" class="text-blue-600 hover:text-blue-800">Proofs.io</a>
+    </footer>
+
+    <script>
+        // Plugin State Management - Handles all local variables data and UI state
+        class VariableManager {
+            constructor() {
+                this.variables = [];
+                this.currentFilter = 'all';
+                this.searchTerm = '';
+                this.editingVariable = null;
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadVariables();
+            }
+
+            // Event binding for all interactive elements
+            bindEvents() {
+                // Search functionality
+                document.getElementById('searchInput').addEventListener('input', (e) => {
+                    this.searchTerm = e.target.value.toLowerCase();
+                    this.renderVariables();
+                });
+
+                // Filter buttons
+                document.querySelectorAll('.filter-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        document.querySelectorAll('.filter-btn').forEach(b => {
+                            b.classList.remove('active', 'bg-blue-100', 'text-blue-800');
+                            b.classList.add('bg-gray-100', 'text-gray-600');
+                        });
+                        e.target.classList.add('active', 'bg-blue-100', 'text-blue-800');
+                        e.target.classList.remove('bg-gray-100', 'text-gray-600');
+                        this.currentFilter = e.target.dataset.type;
+                        this.renderVariables();
+                    });
+                });
+
+                // Create variable buttons
+                document.getElementById('createVariableBtn').addEventListener('click', () => this.openCreateModal());
+                document.getElementById('createFirstBtn').addEventListener('click', () => this.openCreateModal());
+
+                // Modal events
+                document.getElementById('closeModal').addEventListener('click', () => this.closeModal());
+                document.getElementById('cancelBtn').addEventListener('click', () => this.closeModal());
+                document.getElementById('saveBtn').addEventListener('click', () => this.saveVariable());
+
+                // Delete modal events
+                document.getElementById('cancelDeleteBtn').addEventListener('click', () => this.closeDeleteModal());
+                document.getElementById('confirmDeleteBtn').addEventListener('click', () => this.deleteVariable());
+
+                // Variable type change
+                document.getElementById('variableType').addEventListener('change', (e) => {
+                    this.showInputForType(e.target.value);
+                });
+
+                // Color picker sync
+                document.getElementById('colorPicker').addEventListener('change', (e) => {
+                    document.getElementById('colorHex').value = e.target.value;
+                });
+
+                document.getElementById('colorHex').addEventListener('input', (e) => {
+                    if (e.target.value.match(/^#[0-9A-F]{6}$/i)) {
+                        document.getElementById('colorPicker').value = e.target.value;
+                    }
+                });
+
+                // Refresh button
+                document.getElementById('refreshBtn').addEventListener('click', () => {
+                    this.refreshVariables();
+                });
+
+                // Notification close
+                document.getElementById('closeNotification').addEventListener('click', () => {
+                    this.hideNotification();
+                });
+
+                // Modal backdrop click to close
+                document.getElementById('variableModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'variableModal') this.closeModal();
+                });
+
+                document.getElementById('deleteModal').addEventListener('click', (e) => {
+                    if (e.target.id === 'deleteModal') this.closeDeleteModal();
+                });
+            }
+
+            // Load variables from Figma document (simulated)
+            loadVariables() {
+                // In a real Figma plugin, this would use figma.variables.getLocalVariables()
+                // For demo purposes, we'll simulate some variables
+                this.variables = [
+                    { id: '1', name: 'primary-color', type: 'color', value: '#3b82f6', collection: 'Colors' },
+                    { id: '2', name: 'secondary-color', type: 'color', value: '#8b5cf6', collection: 'Colors' },
+                    { id: '3', name: 'font-size-base', type: 'number', value: 16, collection: 'Typography' },
+                    { id: '4', name: 'app-name', type: 'string', value: 'My App', collection: 'Content' },
+                    { id: '5', name: 'is-dark-mode', type: 'boolean', value: false, collection: 'Settings' }
+                ];
+                this.renderVariables();
+            }
+
+            // Refresh variables from Figma document
+            refreshVariables() {
+                const refreshBtn = document.getElementById('refreshBtn');
+                refreshBtn.classList.add('animate-spin');
+                
+                // Simulate API call delay
+                setTimeout(() => {
+                    this.loadVariables();
+                    refreshBtn.classList.remove('animate-spin');
+                    this.showNotification('Variables refreshed successfully', 'success');
+                }, 500);
+            }
+
+            // Render variables list with filtering and search
+            renderVariables() {
+                const container = document.getElementById('variablesList');
+                const emptyState = document.getElementById('emptyState');
+                
+                let filteredVariables = this.variables.filter(variable => {
+                    const matchesFilter = this.currentFilter === 'all' || variable.type === this.currentFilter;
+                    const matchesSearch = variable.name.toLowerCase().includes(this.searchTerm) || 
+                                        variable.value.toString().toLowerCase().includes(this.searchTerm);
+                    return matchesFilter && matchesSearch;
+                });
+
+                if (filteredVariables.length === 0) {
+                    container.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+
+                emptyState.classList.add('hidden');
+                
+                container.innerHTML = filteredVariables.map(variable => `
+                    <!-- Variable Item Component - Reusable card for each variable -->
+                    <div class="variable-item bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all duration-200 cursor-pointer fade-in">
+                        <div class="flex items-center justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <h3 class="font-medium text-gray-800">${variable.name}</h3>
+                                    <span class="type-${variable.type} text-white text-xs px-2 py-1 rounded-full font-medium">
+                                        ${variable.type}
+                                    </span>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    ${this.renderVariableValue(variable)}
+                                    <span class="text-xs text-gray-500">${variable.collection}</span>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2 ml-4">
+                                <button onclick="variableManager.editVariable('${variable.id}')" class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="variableManager.openDeleteModal('${variable.id}')" class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Render variable value based on type
+            renderVariableValue(variable) {
+                switch (variable.type) {
+                    case 'color':
+                        return `
+                            <div class="flex items-center space-x-2">
+                                <div class="w-4 h-4 rounded border border-gray-300" style="background-color: ${variable.value}"></div>
+                                <span class="text-sm text-gray-600 font-mono">${variable.value}</span>
+                            </div>
+                        `;
+                    case 'number':
+                        return `<span class="text-sm text-gray-600 font-mono">${variable.value}</span>`;
+                    case 'string':
+                        return `<span class="text-sm text-gray-600">"${variable.value}"</span>`;
+                    case 'boolean':
+                        return `
+                            <span class="text-sm text-gray-600">
+                                <i class="fas fa-${variable.value ? 'check' : 'times'} text-${variable.value ? 'green' : 'red'}-500 mr-1"></i>
+                                ${variable.value}
+                            </span>
+                        `;
+                    default:
+                        return `<span class="text-sm text-gray-600">${variable.value}</span>`;
+                }
+            }
+
+            // Open create variable modal
+            openCreateModal() {
+                this.editingVariable = null;
+                document.getElementById('modalTitle').textContent = 'Create Variable';
+                this.resetForm();
+                document.getElementById('variableModal').classList.remove('hidden');
+            }
+
+            // Edit existing variable
+            editVariable(id) {
+                this.editingVariable = this.variables.find(v => v.id === id);
+                if (!this.editingVariable) return;
+
+                document.getElementById('modalTitle').textContent = 'Edit Variable';
+                document.getElementById('variableName').value = this.editingVariable.name;
+                document.getElementById('variableType').value = this.editingVariable.type;
+                
+                this.showInputForType(this.editingVariable.type);
+                this.setValueForType(this.editingVariable.type, this.editingVariable.value);
+                
+                document.getElementById('variableModal').classList.remove('hidden');
+            }
+
+            // Set form value based on variable type
+            setValueForType(type, value) {
+                switch (type) {
+                    case 'color':
+                        document.getElementById('colorPicker').value = value;
+                        document.getElementById('colorHex').value = value;
+                        break;
+                    case 'number':
+                        document.getElementById('numberValue').value = value;
+                        break;
+                    case 'string':
+                        document.getElementById('stringValue').value = value;
+                        break;
+                    case 'boolean':
+                        document.querySelector(`input[name="booleanValue"][value="${value}"]`).checked = true;
+                        break;
+                }
+            }
+
+            // Show appropriate input based on variable type
+            showInputForType(type) {
+                document.querySelectorAll('.variable-input').forEach(input => {
+                    input.classList.add('hidden');
+                });
+                document.getElementById(`${type}Input`).classList.remove('hidden');
+            }
+
+            // Reset form to default state
+            resetForm() {
+                document.getElementById('variableName').value = '';
+                document.getElementById('variableType').value = 'color';
+                document.getElementById('colorPicker').value = '#000000';
+                document.getElementById('colorHex').value = '#000000';
+                document.getElementById('numberValue').value = '';
+                document.getElementById('stringValue').value = '';
+                document.querySelectorAll('input[name="booleanValue"]').forEach(input => input.checked = false);
+                this.showInputForType('color');
+            }
+
+            // Save variable (create or update)
+            saveVariable() {
+                const name = document.getElementById('variableName').value.trim();
+                const type = document.getElementById('variableType').value;
+                
+                if (!name) {
+                    this.showNotification('Variable name is required', 'error');
+                    return;
+                }
+
+                // Validate name format
+                if (!/^[a-zA-Z_][a-zA-Z0-9_-]*$/.test(name)) {
+                    this.showNotification('Invalid variable name format', 'error');
+                    return;
+                }
+
+                // Check for duplicate names (except when editing)
+                const existingVariable = this.variables.find(v => v.name === name && v.id !== (this.editingVariable?.id));
+                if (existingVariable) {
+                    this.showNotification('Variable name already exists', 'error');
+                    return;
+                }
+
+                const value = this.getValueForType(type);
+                if (value === null) {
+                    this.showNotification('Please provide a valid value', 'error');
+                    return;
+                }
+
+                if (this.editingVariable) {
+                    // Update existing variable
+                    this.editingVariable.name = name;
+                    this.editingVariable.type = type;
+                    this.editingVariable.value = value;
+                    this.showNotification('Variable updated successfully', 'success');
+                } else {
+                    // Create new variable
+                    const newVariable = {
+                        id: Date.now().toString(),
+                        name,
+                        type,
+                        value,
+                        collection: 'Default'
+                    };
+                    this.variables.push(newVariable);
+                    this.showNotification('Variable created successfully', 'success');
+                }
+
+                this.renderVariables();
+                this.closeModal();
+                
+                // In a real plugin, this would sync with Figma using figma.variables API
+            }
+
+            // Get value from form based on type
+            getValueForType(type) {
+                switch (type) {
+                    case 'color':
+                        const colorValue = document.getElementById('colorHex').value;
+                        return colorValue.match(/^#[0-9A-F]{6}$/i) ? colorValue : null;
+                    case 'number':
+                        const numberValue = parseFloat(document.getElementById('numberValue').value);
+                        return isNaN(numberValue) ? null : numberValue;
+                    case 'string':
+                        return document.getElementById('stringValue').value.trim() || null;
+                    case 'boolean':
+                        const checkedRadio = document.querySelector('input[name="booleanValue"]:checked');
+                        return checkedRadio ? checkedRadio.value === 'true' : null;
+                    default:
+                        return null;
+                }
+            }
+
+            // Close variable modal
+            closeModal() {
+                document.getElementById('variableModal').classList.add('hidden');
+                this.editingVariable = null;
+            }
+
+            // Open delete confirmation modal
+            openDeleteModal(id) {
+                const variable = this.variables.find(v => v.id === id);
+                if (!variable) return;
+
+                document.getElementById('deleteVariableName').textContent = variable.name;
+                document.getElementById('deleteModal').classList.remove('hidden');
+                this.variableToDelete = id;
+            }
+
+            // Close delete modal
+            closeDeleteModal() {
+                document.getElementById('deleteModal').classList.add('hidden');
+                this.variableToDelete = null;
+            }
+
+            // Delete variable
+            deleteVariable() {
+                if (!this.variableToDelete) return;
+
+                this.variables = this.variables.filter(v => v.id !== this.variableToDelete);
+                this.renderVariables();
+                this.closeDeleteModal();
+                this.showNotification('Variable deleted successfully', 'success');
+                
+                // In a real plugin, this would remove the variable from Figma using figma.variables API
+            }
+
+            // Show notification with message and type
+            showNotification(message, type = 'success') {
+                const notification = document.getElementById('notification');
+                const icon = document.getElementById('notificationIcon');
+                const messageEl = document.getElementById('notificationMessage');
+                
+                messageEl.textContent = message;
+                
+                // Reset classes
+                notification.className = 'fixed top-4 right-4 z-50 slide-in';
+                
+                if (type === 'success') {
+                    notification.classList.add('border-green-500');
+                    icon.className = 'fas fa-check-circle text-green-500 mr-3';
+                } else if (type === 'error') {
+                    notification.classList.add('border-red-500');
+                    icon.className = 'fas fa-exclamation-circle text-red-500 mr-3';
+                }
+                
+                notification.classList.remove('hidden');
+                
+                // Auto hide after 3 seconds
+                setTimeout(() => {
+                    this.hideNotification();
+                }, 3000);
+            }
+
+            // Hide notification
+            hideNotification() {
+                document.getElementById('notification').classList.add('hidden');
+            }
+        }
+
+        // Initialize the plugin when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            window.variableManager = new VariableManager();
+        });
+
+        // Keyboard shortcuts for better UX
+        document.addEventListener('keydown', (e) => {
+            // Escape to close modals
+            if (e.key === 'Escape') {
+                const variableModal = document.getElementById('variableModal');
+                const deleteModal = document.getElementById('deleteModal');
+                
+                if (!variableModal.classList.contains('hidden')) {
+                    variableManager.closeModal();
+                } else if (!deleteModal.classList.contains('hidden')) {
+                    variableManager.closeDeleteModal();
+                }
+            }
+            
+            // Ctrl/Cmd + N to create new variable
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                variableManager.openCreateModal();
+            }
+        });
+
+        // Add smooth scrolling behavior for better UX
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>
