@@ -45,7 +45,7 @@
 </head>
 <body class="bg-gray-50 font-sans">
 <script>
-// Begin Mock Figma API for testing with state management
+// Begin Mock Figma API for testing with state management and simulated error responses
 var mockVariables = [
   { id: '1', name: 'primary-color', type: 'color', value: '#3b82f6' },
   { id: '2', name: 'secondary-color', type: 'color', value: '#8b5cf6' },
@@ -65,29 +65,15 @@ if (window === window.parent) {
           }, 500);
         } else if (type === 'createVariable') {
           setTimeout(() => {
-            const newId = String(mockVariables.length + 1);
-            const newVar = { id: newId, name: message.pluginMessage.name, type: message.pluginMessage.variableType, value: 'default' };
-            mockVariables.push(newVar);
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'createVariableSuccess', variable: newVar } } }));
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'createVariableError', message: 'Simulated create error' } } }));
           }, 500);
         } else if (type === 'updateVariable') {
           setTimeout(() => {
-            const varId = message.pluginMessage.variableId;
-            const newValue = message.pluginMessage.value;
-            const variable = mockVariables.find(v => v.id === varId);
-            if (variable) {
-              variable.value = newValue;
-            }
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'updateVariableSuccess', variableId: varId } } }));
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'updateVariableError', message: 'Simulated update error' } } }));
           }, 500);
         } else if (type === 'deleteVariable') {
           setTimeout(() => {
-            // Remove variable with id '2' to simulate deletion
-            const index = mockVariables.findIndex(v => v.id === '2');
-            if (index !== -1) {
-              mockVariables.splice(index, 1);
-            }
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'deleteVariableSuccess', collectionId: message.pluginMessage.collectionId } } }));
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'deleteVariableError', message: 'Simulated delete error' } } }));
           }, 500);
         }
       }
@@ -96,7 +82,7 @@ if (window === window.parent) {
 }
 // End Mock Figma API
 </script>
-<!-- Rest of UI content continues -->
+<!-- Rest of UI content remains unchanged -->
 <div class="w-80 h-screen bg-white shadow-lg flex flex-col">
     <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-md">
         <div class="flex items-center justify-between">
@@ -245,19 +231,10 @@ if (window === window.parent) {
                 if (msg.type === 'loadVariablesSuccess') {
                     this.variables = msg.variables;
                     this.renderVariables();
-                } else if (msg.type === 'createVariableSuccess') {
-                    this.loadVariables();
-                    this.showNotification('Variable created successfully.');
                 } else if (msg.type === 'createVariableError') {
                     this.showNotification('Error creating variable: ' + msg.message);
-                } else if (msg.type === 'updateVariableSuccess') {
-                    this.loadVariables();
-                    this.showNotification('Variable updated successfully.');
                 } else if (msg.type === 'updateVariableError') {
                     this.showNotification('Error updating variable: ' + msg.message);
-                } else if (msg.type === 'deleteVariableSuccess') {
-                    this.loadVariables();
-                    this.showNotification('Variable deleted successfully.');
                 } else if (msg.type === 'deleteVariableError') {
                     this.showNotification('Error deleting variable: ' + msg.message);
                 }
@@ -297,7 +274,6 @@ if (window === window.parent) {
             document.getElementById('saveBtn').addEventListener('click', () => {
                 const name = document.getElementById('variableName').value;
                 const type = document.getElementById('variableType').value;
-                // Placeholder collectionId; in a real scenario, manage collections properly
                 const collectionId = 'defaultCollection';
                 if (this.editingVariable) {
                     const modeId = 'defaultMode';
@@ -341,7 +317,6 @@ if (window === window.parent) {
             }
         }
         loadVariables() {
-            // Request variables from the plugin backend
             parent.postMessage({ pluginMessage: { type: 'loadVariables' } }, '*');
         }
         renderVariables() {
