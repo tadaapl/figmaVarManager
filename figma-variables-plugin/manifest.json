@@ -1,0 +1,14 @@
+{
+  "name": "Figma Variables Plugin",
+  "id": "figma-variables-plugin",
+  "api": "1.0.0",
+  "editorType": ["figma"],
+  "main": "code.js",
+  "ui": "ui.html",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [],
+    "reasoning": ""
+  },
+  "permissions": ["teamlibrary"]
+}
