@@ -44,9 +44,8 @@
     </style>
 </head>
 <body class="bg-gray-50 font-sans">
-    <!-- Main Plugin Container - Plugin UI panel for Figma -->
+    <!-- Main Plugin Container -->
     <div class="w-80 h-screen bg-white shadow-lg flex flex-col">
-        <!-- Header Component -->
         <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-md">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-2">
@@ -58,8 +57,6 @@
                 </button>
             </div>
         </header>
-
-        <!-- Search and Filter Component -->
         <div class="p-4 border-b border-gray-200">
             <div class="relative">
                 <input type="text" id="searchInput" placeholder="Search variables..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
@@ -72,12 +69,8 @@
                 <button class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors" data-type="string">String</button>
             </div>
         </div>
-
-        <!-- Variables List Component -->
         <div class="flex-1 overflow-y-auto custom-scrollbar">
-            <div id="variablesList" class="p-4 space-y-3">
-                <!-- Dynamically populated variable items -->
-            </div>
+            <div id="variablesList" class="p-4 space-y-3"></div>
             <div id="emptyState" class="hidden flex flex-col items-center justify-center h-full text-gray-500 p-8">
                 <i class="fas fa-layer-group text-4xl mb-4 opacity-50"></i>
                 <h3 class="text-lg font-medium mb-2">No Variables Found</h3>
@@ -87,16 +80,13 @@
                 </button>
             </div>
         </div>
-
-        <!-- Action Buttons Component -->
         <div class="p-4 border-t border-gray-200 bg-gray-50">
             <button id="createVariableBtn" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all duration-200 font-medium">
                 <i class="fas fa-plus mr-2"></i>Create New Variable
             </button>
         </div>
     </div>
-
-    <!-- Create/Edit Variable Modal Component -->
+    <!-- Create/Edit Variable Modal -->
     <div id="variableModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center">
         <div class="bg-white rounded-xl shadow-2xl w-96 max-w-full mx-4 slide-in">
             <div class="flex items-center justify-between p-6 border-b border-gray-200">
@@ -158,8 +148,7 @@
             </div>
         </div>
     </div>
-
-    <!-- Delete Confirmation Modal Component -->
+    <!-- Delete Confirmation Modal -->
     <div id="deleteModal" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center">
         <div class="bg-white rounded-xl shadow-2xl w-96 max-w-full mx-4 slide-in">
             <div class="p-6 text-center">
@@ -175,7 +164,6 @@
             </div>
         </div>
     </div>
-
     <!-- Notification Component -->
     <div id="notification" class="hidden fixed top-4 right-4 z-50 slide-in">
         <div class="bg-white border-l-4 border-green-500 rounded-lg shadow-lg p-4 max-w-sm">
@@ -190,24 +178,40 @@
             </div>
         </div>
     </div>
-
-    <!-- Footer removed for Figma Plugin environment -->
     <script>
-        // Plugin State Management
+        // Plugin State Management with real Figma API communication
         class VariableManager {
             constructor() {
                 this.variables = [];
                 this.currentFilter = 'all';
                 this.searchTerm = '';
                 this.editingVariable = null;
-                this.init();
-            }
-            init() {
                 this.bindEvents();
                 this.loadVariables();
+                window.addEventListener('message', (event) => {
+                    const msg = event.data.pluginMessage;
+                    if (msg.type === 'loadVariablesSuccess') {
+                        this.variables = msg.variables;
+                        this.renderVariables();
+                    } else if (msg.type === 'createVariableSuccess') {
+                        this.loadVariables();
+                        this.showNotification('Variable created successfully.');
+                    } else if (msg.type === 'createVariableError') {
+                        this.showNotification('Error creating variable: ' + msg.message);
+                    } else if (msg.type === 'updateVariableSuccess') {
+                        this.loadVariables();
+                        this.showNotification('Variable updated successfully.');
+                    } else if (msg.type === 'updateVariableError') {
+                        this.showNotification('Error updating variable: ' + msg.message);
+                    } else if (msg.type === 'deleteVariableSuccess') {
+                        this.loadVariables();
+                        this.showNotification('Variable deleted successfully.');
+                    } else if (msg.type === 'deleteVariableError') {
+                        this.showNotification('Error deleting variable: ' + msg.message);
+                    }
+                });
             }
             bindEvents() {
-                // Bind search input event
                 const searchInput = document.getElementById('searchInput');
                 if (searchInput) {
                     searchInput.addEventListener('input', (e) => {
@@ -215,7 +219,6 @@
                         this.renderVariables();
                     });
                 }
-                // Bind filter buttons
                 const filterButtons = document.querySelectorAll('.filter-btn');
                 filterButtons.forEach(button => {
                     button.addEventListener('click', () => {
@@ -225,137 +228,112 @@
                         this.renderVariables();
                     });
                 });
-                // Modal related event bindings
-                const createVariableBtn = document.getElementById('createVariableBtn');
-                if(createVariableBtn) {
-                    createVariableBtn.addEventListener('click', () => {
-                        document.getElementById('variableModal').classList.remove('hidden');
-                        document.getElementById('modalTitle').textContent = 'Create Variable';
-                    });
-                }
-                const createFirstBtn = document.getElementById('createFirstBtn');
-                if(createFirstBtn) {
-                    createFirstBtn.addEventListener('click', () => {
-                        document.getElementById('variableModal').classList.remove('hidden');
-                        document.getElementById('modalTitle').textContent = 'Create Variable';
-                    });
-                }
-                const closeModal = document.getElementById('closeModal');
-                if(closeModal) {
-                    closeModal.addEventListener('click', () => {
-                        document.getElementById('variableModal').classList.add('hidden');
-                    });
-                }
-                const cancelBtn = document.getElementById('cancelBtn');
-                if(cancelBtn) {
-                    cancelBtn.addEventListener('click', () => {
-                        document.getElementById('variableModal').classList.add('hidden');
-                    });
-                }
-                const saveBtn = document.getElementById('saveBtn');
-                if(saveBtn) {
-                    saveBtn.addEventListener('click', () => {
-                        alert('Variable saved (simulation)');
-                        document.getElementById('variableModal').classList.add('hidden');
-                    });
-                }
-                const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-                if(cancelDeleteBtn) {
-                    cancelDeleteBtn.addEventListener('click', () => {
-                        document.getElementById('deleteModal').classList.add('hidden');
-                    });
-                }
-                const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-                if(confirmDeleteBtn) {
-                    confirmDeleteBtn.addEventListener('click', () => {
-                        alert('Variable deleted (simulation)');
-                        document.getElementById('deleteModal').classList.add('hidden');
-                    });
-                }
-                // Event for variable type input switching
+                document.getElementById('createVariableBtn').addEventListener('click', () => {
+                    document.getElementById('variableModal').classList.remove('hidden');
+                    document.getElementById('modalTitle').textContent = 'Create Variable';
+                });
+                document.getElementById('createFirstBtn').addEventListener('click', () => {
+                    document.getElementById('variableModal').classList.remove('hidden');
+                    document.getElementById('modalTitle').textContent = 'Create Variable';
+                });
+                document.getElementById('closeModal').addEventListener('click', () => {
+                    document.getElementById('variableModal').classList.add('hidden');
+                });
+                document.getElementById('cancelBtn').addEventListener('click', () => {
+                    document.getElementById('variableModal').classList.add('hidden');
+                });
+                document.getElementById('saveBtn').addEventListener('click', () => {
+                    const name = document.getElementById('variableName').value;
+                    const type = document.getElementById('variableType').value;
+                    // Placeholder collectionId; in a real scenario, manage collections properly
+                    const collectionId = 'defaultCollection';
+                    if (this.editingVariable) {
+                        const modeId = 'defaultMode';
+                        const value = type === 'color' ? document.getElementById('colorHex').value :
+                                      type === 'number' ? document.getElementById('numberValue').value :
+                                      type === 'string' ? document.getElementById('stringValue').value :
+                                      type === 'boolean' ? (document.querySelector('input[name="booleanValue"]:checked') || {}).value : '';
+                        parent.postMessage({ pluginMessage: { type: 'updateVariable', variableId: this.editingVariable.id, modeId: modeId, value: value } }, '*');
+                        this.editingVariable = null;
+                    } else {
+                        parent.postMessage({ pluginMessage: { type: 'createVariable', name: name, collectionId: collectionId, variableType: type } }, '*');
+                    }
+                    document.getElementById('variableModal').classList.add('hidden');
+                });
+                document.getElementById('cancelDeleteBtn').addEventListener('click', () => {
+                    document.getElementById('deleteModal').classList.add('hidden');
+                });
+                document.getElementById('confirmDeleteBtn').addEventListener('click', () => {
+                    const collectionId = 'defaultCollection';
+                    parent.postMessage({ pluginMessage: { type: 'deleteVariable', collectionId: collectionId } }, '*');
+                    document.getElementById('deleteModal').classList.add('hidden');
+                });
                 const variableTypeSelect = document.getElementById('variableType');
-                if(variableTypeSelect) {
+                if (variableTypeSelect) {
                     variableTypeSelect.addEventListener('change', (e) => {
                         const type = e.target.value;
                         document.getElementById('colorInput').classList.add('hidden');
                         document.getElementById('numberInput').classList.add('hidden');
                         document.getElementById('stringInput').classList.add('hidden');
                         document.getElementById('booleanInput').classList.add('hidden');
-                        if(type === 'color'){
+                        if (type === 'color') {
                             document.getElementById('colorInput').classList.remove('hidden');
-                        } else if(type === 'number'){
+                        } else if (type === 'number') {
                             document.getElementById('numberInput').classList.remove('hidden');
-                        } else if(type === 'string'){
+                        } else if (type === 'string') {
                             document.getElementById('stringInput').classList.remove('hidden');
-                        } else if(type === 'boolean'){
+                        } else if (type === 'boolean') {
                             document.getElementById('booleanInput').classList.remove('hidden');
                         }
                     });
                 }
             }
             loadVariables() {
-                // Simulated variables for demo
-                this.variables = [
-                    { id: '1', name: 'primary-color', type: 'color', value: '#3b82f6', collection: 'Colors' },
-                    { id: '2', name: 'secondary-color', type: 'color', value: '#8b5cf6', collection: 'Colors' },
-                    { id: '3', name: 'font-size-base', type: 'number', value: 16, collection: 'Typography' },
-                    { id: '4', name: 'app-name', type: 'string', value: 'My App', collection: 'Content' },
-                    { id: '5', name: 'is-dark-mode', type: 'boolean', value: false, collection: 'Settings' }
-                ];
-                this.renderVariables();
+                // Request variables from the plugin backend
+                parent.postMessage({ pluginMessage: { type: 'loadVariables' } }, '*');
             }
             renderVariables() {
                 const variablesList = document.getElementById('variablesList');
                 const emptyState = document.getElementById('emptyState');
-                const filteredVariables = this.variables.filter(variable => {
-                    const matchesFilter = (this.currentFilter === 'all' || variable.type === this.currentFilter);
+                const filtered = this.variables.filter(variable => {
+                    const matchesFilter = this.currentFilter === 'all' || variable.type === this.currentFilter;
                     const matchesSearch = variable.name.toLowerCase().includes(this.searchTerm);
                     return matchesFilter && matchesSearch;
                 });
                 variablesList.innerHTML = '';
-                if (filteredVariables.length === 0) {
+                if (filtered.length === 0) {
                     emptyState.classList.remove('hidden');
                 } else {
                     emptyState.classList.add('hidden');
-                    filteredVariables.forEach(variable => {
-                        const variableItem = document.createElement('div');
-                        variableItem.className = 'variable-item flex items-center justify-between p-2 border rounded bg-white shadow-sm slide-in';
-                        
-                        const typeBadge = document.createElement('span');
-                        typeBadge.className = 'px-2 py-1 text-xs rounded text-white';
-                        if (variable.type === 'color') {
-                            typeBadge.classList.add('type-color');
-                        } else if (variable.type === 'number') {
-                            typeBadge.classList.add('type-number');
-                        } else if (variable.type === 'string') {
-                            typeBadge.classList.add('type-string');
-                        } else if (variable.type === 'boolean') {
-                            typeBadge.classList.add('type-boolean');
-                        }
-                        typeBadge.textContent = variable.type;
-                        
-                        const detailsDiv = document.createElement('div');
-                        detailsDiv.className = 'flex flex-col ml-2';
+                    filtered.forEach(variable => {
+                        const item = document.createElement('div');
+                        item.className = 'variable-item flex items-center justify-between p-2 border rounded bg-white shadow-sm slide-in';
+                        const badge = document.createElement('span');
+                        badge.className = 'px-2 py-1 text-xs rounded text-white';
+                        if (variable.type === 'color') badge.classList.add('type-color');
+                        else if (variable.type === 'number') badge.classList.add('type-number');
+                        else if (variable.type === 'string') badge.classList.add('type-string');
+                        else if (variable.type === 'boolean') badge.classList.add('type-boolean');
+                        badge.textContent = variable.type;
+                        const details = document.createElement('div');
+                        details.className = 'flex flex-col ml-2';
                         const nameEl = document.createElement('span');
                         nameEl.className = 'font-bold';
                         nameEl.textContent = variable.name;
                         const valueEl = document.createElement('span');
                         valueEl.className = 'text-sm text-gray-600';
                         valueEl.textContent = 'Value: ' + variable.value;
-                        detailsDiv.appendChild(nameEl);
-                        detailsDiv.appendChild(valueEl);
-                        
-                        // Add edit and delete buttons
+                        details.appendChild(nameEl);
+                        details.appendChild(valueEl);
                         const editBtn = document.createElement('button');
                         editBtn.innerHTML = '<i class="fas fa-edit"></i>';
                         editBtn.className = 'text-blue-500 hover:text-blue-700 ml-2';
                         editBtn.addEventListener('click', () => {
                             this.editingVariable = variable;
                             document.getElementById('modalTitle').textContent = 'Edit Variable';
-                            // (Prefill form inputs if needed)
+                            document.getElementById('variableName').value = variable.name;
                             document.getElementById('variableModal').classList.remove('hidden');
                         });
-                        
                         const deleteBtn = document.createElement('button');
                         deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
                         deleteBtn.className = 'text-red-500 hover:text-red-700 ml-2';
@@ -363,15 +341,21 @@
                             document.getElementById('deleteVariableName').textContent = variable.name;
                             document.getElementById('deleteModal').classList.remove('hidden');
                         });
-                        
-                        variableItem.appendChild(typeBadge);
-                        variableItem.appendChild(detailsDiv);
-                        variableItem.appendChild(editBtn);
-                        variableItem.appendChild(deleteBtn);
-                        
-                        variablesList.appendChild(variableItem);
+                        item.appendChild(badge);
+                        item.appendChild(details);
+                        item.appendChild(editBtn);
+                        item.appendChild(deleteBtn);
+                        variablesList.appendChild(item);
                     });
                 }
+            }
+            showNotification(message) {
+                const notification = document.getElementById('notification');
+                document.getElementById('notificationMessage').textContent = message;
+                notification.classList.remove('hidden');
+                setTimeout(() => {
+                    notification.classList.add('hidden');
+                }, 3000);
             }
         }
         
