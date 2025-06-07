@@ -45,7 +45,15 @@
 </head>
 <body class="bg-gray-50 font-sans">
 <script>
-// Begin Mock Figma API for testing
+// Begin Mock Figma API for testing with state management
+var mockVariables = [
+  { id: '1', name: 'primary-color', type: 'color', value: '#3b82f6' },
+  { id: '2', name: 'secondary-color', type: 'color', value: '#8b5cf6' },
+  { id: '3', name: 'font-size-base', type: 'number', value: 16 },
+  { id: '4', name: 'app-name', type: 'string', value: 'My App' },
+  { id: '5', name: 'is-dark-mode', type: 'boolean', value: false }
+];
+
 if (window === window.parent) {
   window.parent = {
     postMessage: function(message, targetOrigin) {
@@ -53,24 +61,32 @@ if (window === window.parent) {
         const type = message.pluginMessage.type;
         if (type === 'loadVariables') {
           setTimeout(() => {
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'loadVariablesSuccess', variables: [
-              { id: '1', name: 'primary-color', type: 'color', value: '#3b82f6' },
-              { id: '2', name: 'secondary-color', type: 'color', value: '#8b5cf6' },
-              { id: '3', name: 'font-size-base', type: 'number', value: 16 },
-              { id: '4', name: 'app-name', type: 'string', value: 'My App' },
-              { id: '5', name: 'is-dark-mode', type: 'boolean', value: false }
-            ] } } }));
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'loadVariablesSuccess', variables: mockVariables } } }));
           }, 500);
         } else if (type === 'createVariable') {
           setTimeout(() => {
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'createVariableSuccess', variable: { id: 'new-id', name: message.pluginMessage.name, type: message.pluginMessage.variableType, value: 'default' } } } }));
+            const newId = String(mockVariables.length + 1);
+            const newVar = { id: newId, name: message.pluginMessage.name, type: message.pluginMessage.variableType, value: 'default' };
+            mockVariables.push(newVar);
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'createVariableSuccess', variable: newVar } } }));
           }, 500);
         } else if (type === 'updateVariable') {
           setTimeout(() => {
-            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'updateVariableSuccess', variableId: message.pluginMessage.variableId } } }));
+            const varId = message.pluginMessage.variableId;
+            const newValue = message.pluginMessage.value;
+            const variable = mockVariables.find(v => v.id === varId);
+            if (variable) {
+              variable.value = newValue;
+            }
+            window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'updateVariableSuccess', variableId: varId } } }));
           }, 500);
         } else if (type === 'deleteVariable') {
           setTimeout(() => {
+            // Remove variable with id '2' to simulate deletion
+            const index = mockVariables.findIndex(v => v.id === '2');
+            if (index !== -1) {
+              mockVariables.splice(index, 1);
+            }
             window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'deleteVariableSuccess', collectionId: message.pluginMessage.collectionId } } }));
           }, 500);
         }
